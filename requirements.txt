@@ -12,3 +12,4 @@ streamlit
 fastapi
 uvicorn[standard]
 httpx
+langchain-ollama

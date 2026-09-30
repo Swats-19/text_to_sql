@@ -18,7 +18,7 @@ POSTGRES_CONFIG = {
     "port": 5433,
     "dbname": "ecommerce",
     "user": "postgres",
-    "password": os.getenv("PGPASSWORD")  # Change this to your actual password
+    "password":"swats@1234"  # Change this to your actual password
 }
 
 # ============================================================
