@@ -1,171 +1,138 @@
-# AI Text-to-SQL Agent
+On-Device AI Text-to-SQL Agent
 
-An AI-powered system that lets users query an e-commerce database using natural language instead of writing SQL manually.
+An AI-powered, 100% local database intelligence agent running on Qualcomm Snapdragon hardware via Ollama. It enables users to query e-commerce databases using natural language without sending sensitive schema or enterprise data to cloud APIs.
 
-## Why This Project?
+Why This Project?
 
-SQL is powerful, but querying a database usually requires users to understand tables, relationships, joins, and SQL syntax. LLMs make natural-language database interaction possible, but simply asking an LLM to generate SQL is not always reliable — a query can be syntactically valid while still being logically wrong.
+SQL is powerful, but querying enterprise databases usually requires deep knowledge of table schemas, relationships, joins, and SQL syntax. While Cloud LLMs can generate SQL, passing live database structures over the internet poses major privacy and data security risks. Furthermore, standard single-shot LLM queries often fail silently—producing syntactically valid but logically incorrect SQL.
 
-This project explores a simple question:
+This project addresses two core challenges:
 
-**What happens when we move from a single LLM call to a controlled, self-correcting AI workflow?**
+Privacy & Offline Edge AI: Running small, quantized code models (SLMs) locally on Snapdragon hardware via Ollama so zero data leaves the local machine.
 
-To demonstrate this, I built the same Text-to-SQL problem using **two different architectures**.
+Reliability via Agentic Workflows: Moving from a single fragile LLM call to a controlled, self-correcting LangGraph pipeline that validates, heals, and approves queries before execution.
 
-## 1. Monolithic Architecture
+Architecture Comparison
 
-The baseline implementation keeps the workflow simple:
+1. Monolithic Baseline (Local Single-Shot)
 
-```text
-User Question
-      ↓
-     LLM
-      ↓
- Generated SQL
-      ↓
-   Database
-      ↓
-    Result
-```
+A standard local baseline that passes the prompt directly to an edge SLM:
 
-It is straightforward and works well for simple queries, but there is no independent validation or recovery step between SQL generation and execution.
+User Question ──► Ollama (Local SLM) ──► Generated SQL ──► Database ──► Result
 
-## 2. Agentic Architecture
 
-The second implementation uses **LangGraph** to turn the pipeline into a multi-step workflow:
+Simple and low-latency, but lacks independent verification or recovery if the local model misinterprets a complex join.
 
-```text
+2. Agentic Architecture (Self-Healing Edge Pipeline)
+
+A multi-step LangGraph workflow optimized for running small, fast local models with strict validation guardrails:
+
 User Question
       ↓
 Database Connection
       ↓
-Schema Loading
+Schema Loading & Filtering (Keeps context slim for edge SLMs)
       ↓
-Schema Filtering
+SQL Generator (Ollama / Local Qwen2.5-Coder or Llama-3.2)
       ↓
-SQL Generator
-      ↓
-SQL Judge
-   ↙       ↘
-Reject    Approve
-  ↓          ↓
-Regenerate  Human Approval
-              ↓
-        ┌─────┴─────┐
-      Reject       Approve
-        ↓             ↓
-    Regenerate     Execute
-                      ↓
-                 Explain Result
-```
+SQL Judge (Independent local validation step)
+     ↙         ↘
+Reject         Approve
+  ↓               ↓
+Regenerate     Human Approval (Pro Mode)
+                   ↓
+             ┌─────┴─────┐
+           Reject     Approve
+             ↓           ↓
+         Regenerate   Execute (Read-Only Safety Guard)
+                         ↓
+                   Explain Result
 
-### Why is this better?
 
-The agentic version adds **verification and recovery** instead of blindly trusting the first LLM response.
+Key Advantages for Snapdragon Edge AI
 
-* **SQL Judge** — independently evaluates the generated SQL
-* **Self-Healing** — rejected SQL is regenerated using the judge's feedback
-* **Human-in-the-Loop** — the user can approve, reject, or provide feedback before execution
-* **Checkpointing** — the workflow can pause and resume without losing state
-* **Observability** — LangSmith tracks the workflow, LLM calls, retries, latency and token usage
-* **Multi-Provider LLMs** — supports fallback across configured LLM providers
+100% Privacy & Zero Cloud Dependency: Powered locally by Ollama, keeping database credentials, sensitive rows, and schema metadata entirely on-device.
 
-The goal is not just to generate SQL, but to make the AI workflow **more reliable, controllable, and observable**.
+Optimized for Snapdragon ARM64: Leverages lightweight, quantized Small Language Models (such as qwen2.5-coder:1.5b or llama3.2:3b) running natively on Snapdragon X Elite / Copilot+ PC architectures.
 
-## Why AI?
+Context-Aware Schema Filtering: Prunes large database schemas dynamically so local SLMs process only relevant tables, maximizing token generation speed and reducing memory consumption.
 
-Natural language is a much more accessible interface to data than requiring every user to know SQL.
+SQL Judge & Self-Healing: Smaller edge models occasionally make syntax errors. The SQL Judge catches failures locally and feeds error traces back to the model for automatic self-correction.
 
-AI can translate a question such as:
+Human-in-the-Loop & Read-Only Safety: Pauses execution for user approval in Pro Mode while strictly enforcing read-only SQL statements to protect local storage from corruption.
 
-> "Show me the top 5 customers by total spending."
+Multi-Provider Fallback: Defaults to local Ollama execution while retaining optional fallback support for cloud providers (Gemini, Groq, Cohere) when internet connectivity is available.
 
-into a database query without requiring the user to understand the underlying schema or SQL syntax.
+Tech Stack
 
-The challenge is making that translation trustworthy. That is where the validation, retry, human approval, and observability layers become important.
+Local Inference Engine: Ollama (Qwen2.5-Coder 1.5B/7B, Llama 3.2 3B)
 
-## Demo
+Target Hardware: Qualcomm Snapdragon X Elite / Copilot+ PC (ARM64 Native)
 
-**5-Minute Pitch Video:**
-[Add YouTube link]
+Agentic Framework: LangGraph, LangChain
 
-The demo shows:
+Backend & API: Python 3.12, FastAPI, Server-Sent Events (SSE)
 
-1. A normal successful query
-2. SQL Judge rejection and automatic regeneration
-3. Human-in-the-Loop approval and workflow resumption
-4. LangSmith traces showing what happened inside the workflow
+Databases: SQLite (Default Local) / PostgreSQL
 
-## Tech Stack
+Frontend: React + Tailwind UI / Streamlit
 
-* Python
-* LangGraph
-* LangChain
-* Streamlit
-* SQLite / PostgreSQL
-* Gemini / Groq / Cohere
-* LangSmith
+Observability & Safety: LangSmith Tracing, Read-Only SQL Interceptor
 
-## Run Locally
+Run Locally
 
-For complete first-time installation, PostgreSQL setup, testing, and
-troubleshooting, see [FIRST_TIME_SETUP.md](FIRST_TIME_SETUP.md).
+1. Start Local Ollama Model
 
-Create and activate an isolated Python environment:
+Ensure Ollama is installed and run your preferred code model locally:
 
-```powershell
+ollama run qwen2.5-coder:1.5b
+
+
+2. Environment Setup
+
+Create and activate an isolated Python 3.12 environment:
+
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
-```
 
-Copy `.env.example` to `.env` and configure `DATABASE_URL` plus at least
-`GEMINI_API_KEY_1`.
 
-Install the React UI:
+Copy .env.example to .env and configure your local Ollama endpoint and database URL:
 
-```powershell
-Set-Location ui
-npm install
-```
+OLLAMA_HOST=http://localhost:11434
+DEFAULT_MODEL=qwen2.5-coder:1.5b
+DATABASE_URL=sqlite:///./database/ecommerce.db
 
-Start both the API and UI:
 
-```powershell
+3. Launch Application
+
+Start the API backend and React UI using the automated script:
+
 .\start-app.ps1
-```
 
-Open `http://127.0.0.1:5173`.
 
-Stop both services with:
+Access the application at http://127.0.0.1:5173.
 
-```powershell
+To stop all background services:
+
 .\stop-app.ps1
-```
 
-The React interface communicates with the existing LangGraph workflow through
-server-sent events. Pro mode pauses for human approval; Non-Pro mode
-automatically approves the query. Both modes enforce read-only SQL.
 
-## Project Structure
+Project Structure
 
-```text
 text_to_sql/
-├── database/
-├── skills/
-├── ui/
-├── api.py
-├── llm.py
-├── prompt.py
-├── text_to_sql.py
-├── execute.py
-├── mon.py
-└── skills.py
-```
+├── database/         # Local SQLite sample datasets & migrations
+├── skills/           # Schema extraction & pruning utilities
+├── ui/               # React frontend with SSE streaming
+├── api.py            # FastAPI streaming backend endpoints
+├── llm.py            # Ollama & local provider abstraction
+├── prompt.py         # System prompts optimized for edge SLMs
+├── text_to_sql.py    # Main LangGraph agentic state machine
+├── execute.py        # Safe read-only SQL execution engine
+├── mon.py            # Monolithic baseline runner
+└── start-app.ps1     # One-click launcher script
 
-**Developer : Swati Muttin**
 
-## Built For
-**Razorpay AI Buildathon**
+Developer: Swati Muttin
 
-This project focuses on a real problem — making database access easier through natural language — while exploring how **agentic AI can improve reliability beyond a basic LLM pipeline**.
+Built For: Snapdragon AI Hackathon (Edge AI & On-Device Innovation)
